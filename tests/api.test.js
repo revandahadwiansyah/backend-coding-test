@@ -13,6 +13,18 @@ const eslint = new ESLint()
 const winston = require('winston')
 const expressWinston = require('express-winston')
 const appRoot = require('app-root-path')
+const logger = winston.createLogger({
+    transports: [
+        new winston.transports.File({
+            level: 'info',
+            filename: `${appRoot}/logs/app.log`,
+            handleExpections: true,
+            json: true,
+            maxsize: 5242880 //5MB   
+        }),
+        new winston.transports.Console()
+    ]
+})
 
 describe('API tests', () => {
     before((done) => {
@@ -28,6 +40,7 @@ describe('API tests', () => {
     })
 
     describe('GET /health', (done) => {
+        logger.info('API[GET]: health')
         it('should return health', (done) => {
             request(app)
                 .get('/health')
@@ -35,46 +48,13 @@ describe('API tests', () => {
                 .send()
                 .expect(200, done)
                 .end((err, res) => {
-                    expressWinstonLoggger(res)
-                    if(err)
-                        expressWinstonLoggger(err)
+                    if(err){
+                        logger.error(err)
                         return done(err)
+                    }
 
                     done()
                 })
         })
     })
 })
-
-function expressWinstonLoggger(formatter){
-    var opt = {
-        file:{
-            level: 'info',
-            filename: `${appRoot}/logs/app.log`,
-            handleExpections: true,
-            json: true,
-            maxsize: 5242880 //5MB        
-        },
-        console: {
-            level: 'debug',
-            handleExpections: true,
-            json: true
-        }
-    }
-    return expressWinston.logger({
-      transports: [
-        new winston.transports.File(opt.file),
-        new winston.transports.Console(opt.console)
-      ],
-      format: winston.format.combine(
-        winston.format.timestamp({
-            format: 'YYYY-MM-DD HH:mm:ss.SSS'
-        }),
-        winston.format.colorize(),
-        winston.format.json()
-      ),
-      meta: true,
-      msg: 'HTTP {{req.method}} {{req.url}}',
-      expressFormat: true
-    })
-}
