@@ -8,12 +8,22 @@ const bodyParser = require('body-parser')
 const jsonParser = bodyParser.json()
 
 module.exports = (db, logger) => {
-    app.get('/health', (req, res) => {
+    app.get('/health', async (req, res) => {
         logger.info('API[GET]: health')
-        res.send('Healthy')
+        return new Promise((resolve,reject) => {
+            try{
+                resolve(res.send('health'))
+            }catch(e){
+                logger.error(e)
+                resolve(res.send({
+                    error_code: 'CATCH_ERROR',
+                    message: e,
+                }))
+            }
+        })
     })
 
-    app.post('/rides', jsonParser, (req, res) => {
+    app.post('/rides', jsonParser, async (req, res) => {
         logger.info('API[POST]: rides')
         logger.info(`params: ${JSON.stringify(req.body)}`)
         const startLatitude = Number(req.body.start_lat)
@@ -81,84 +91,43 @@ module.exports = (db, logger) => {
             })
         }
 
-        var values = [
-            req.body.start_lat,
-            req.body.start_long,
-            req.body.end_lat,
-            req.body.end_long,
-            req.body.rider_name,
-            req.body.driver_name,
-            req.body.driver_vehicle,
-        ]
-
-        const result = db.run(
-            'INSERT INTO Rides(startLat, startLong, endLat, endLong, riderName, driverName, driverVehicle) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            values,
-            function (err) {
-                if (err) {
-                    logger.error(err)
-                    return res.send({
-                        error_code: 'SERVER_ERROR',
-                        message: 'Unknown error',
-                    })
-                }
-
-                db.all(
-                    'SELECT * FROM Rides WHERE rideID = ?',
-                    this.lastID,
-                    function (err, rows) {
-                        if (err) {
-                            logger.error(err)
-                            return res.send({
-                                error_code: 'SERVER_ERROR',
-                                message: 'Unknown error',
-                            })
-                        }
-
-                        res.send(rows)
-                    }
-                )
-            }
-        )
+        const insertData = await insertRiders(db, logger, req.body);
+        
+        const response = await getRiderDetails(db, logger, insertData);
+        res.send(response)
     })
 
-    app.get('/rides', (req, res) => {
+    app.get('/rides', async (req, res) => {
         logger.info('API[GET]: rides')
         logger.info(`params: ${JSON.stringify(req.query)}`)
-        var sqlQueries = `SELECT * FROM Rides Limit ${maxLimit}`;
-        if(typeof req.query.pages != 'undefined'){
-            sqlQueries += ` offset ${parseInt(req.query.pages)}`
-        }
-        db.all(sqlQueries, function (err, rows) {
-            if (err) {
-                logger.error(err)
-                return res.send({
-                    error_code: 'SERVER_ERROR',
-                    message: 'Unknown error',
-                })
-            }
-
-            if (rows.length === 0) {
-                logger.warn(`Rows: ${rows.length}`)
-                return res.send({
-                    error_code: 'RIDES_NOT_FOUND_ERROR',
-                    message: 'Could not find any rides',
-                })
-            }
-
-            res.send(rows)
-        })
+        const response = await getRiders(db, logger, req.query);
+        res.send(response)
     })
 
-    app.get('/rides/:id', (req, res) => {
+    app.get('/rides/:id', async (req, res) => {
         Logger.info(`API[GET]: rides/${req.params.id}`)
         logger.info(`params: ${JSON.stringify(req.params)}`)
-        db.all(
-            `SELECT * FROM Rides WHERE rideID='${req.params.id}'`,
-            function (err, rows) {
+        const response = await getRiderDetails(db, logger, req.params);
+        res.send(response)
+        
+    })
+
+    return app
+}
+
+async function getRiders(db, logger, params) {
+    logger.info(`getRiders(): ${JSON.stringify(params)}`)
+    return new Promise((resolve,reject) => {
+        try{
+            var sqlQueries = `SELECT * FROM Rides Limit ${maxLimit}`;
+            if(typeof params.pages != 'undefined'){
+                sqlQueries += ` offset ${parseInt(params.pages)}`
+            }
+
+            db.all(sqlQueries, (err, rows) => {
                 if (err) {
                     logger.error(err)
-                    return res.send({
+                    reject({
                         error_code: 'SERVER_ERROR',
                         message: 'Unknown error',
                     })
@@ -166,16 +135,90 @@ module.exports = (db, logger) => {
 
                 if (rows.length === 0) {
                     logger.warn(`Rows: ${rows.length}`)
-                    return res.send({
+                    reject({
                         error_code: 'RIDES_NOT_FOUND_ERROR',
                         message: 'Could not find any rides',
                     })
                 }
-
-                res.send(rows)
-            }
-        )
+                resolve(rows)
+            })
+        }catch(e){
+            logger.error(e)
+            reject({
+                error_code: 'CATCH_ERROR',
+                message: e,
+            })
+        }
     })
+}
 
-    return app
+async function getRiderDetails(db, logger, params) {
+    logger.info(`getRiders(): ${JSON.stringify(params)}`)
+    return new Promise((resolve,reject) => {
+        try{
+            db.all(
+            `SELECT * FROM Rides WHERE rideID='${req.params.id}'`,
+            function (err, rows) {
+                if (err) {
+                    logger.error(err)
+                    reject({
+                        error_code: 'SERVER_ERROR',
+                        message: 'Unknown error',
+                    })
+                }
+
+                if (rows.length === 0) {
+                    logger.warn(`Rows: ${rows.length}`)
+                    reject({
+                        error_code: 'RIDES_NOT_FOUND_ERROR',
+                        message: 'Could not find any rides',
+                    })
+                }
+                resolve(rows)
+            })
+        }catch(e){
+            logger.error(e)
+            reject({
+                error_code: 'CATCH_ERROR',
+                message: e,
+            })
+        }
+    })
+}
+
+async function insertRiders(db, logger, params) {
+    logger.info(`getRiders(): ${JSON.stringify(params)}`)
+    return new Promise((resolve,reject) => {
+        try{
+            var values = [
+                params.start_lat,
+                params.start_long,
+                params.end_lat,
+                params.end_long,
+                params.rider_name,
+                params.driver_name,
+                params.driver_vehicle,
+            ]
+
+            db.all(
+            'INSERT INTO Rides(startLat, startLong, endLat, endLong, riderName, driverName, driverVehicle) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            values,
+            function (err, rows) {
+                if (err) {
+                    logger.error(err)
+                    reject({
+                        error_code: 'SERVER_ERROR',
+                        message: 'Unknown error',
+                    })
+                }
+                resolve(this.lastID)
+            })
+        }catch(e){
+            logger.error(e)
+            reject({
+                error_code: 'CATCH_ERROR',
+                message: e,
+            })
+        }
+    })
 }
