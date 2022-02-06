@@ -6,6 +6,7 @@ const port = 8010
 const { ESLint } = require('eslint')
 const eslint = new ESLint()
 const winston = require('winston')
+const {combine, timestamp, json} = winston.format;
 const expressWinston = require('express-winston')
 const appRoot = require('app-root-path')
 
@@ -21,16 +22,37 @@ const db = new sqlite3.Database('db.sqlite', (err) => {
 })
 const buildSchemas = require('./src/schemas')
 
+const todays = new Date().toISOString().slice(0, 10);
 const logger = winston.createLogger({
+    format: combine(timestamp(), json()),
     transports: [
         new winston.transports.File({
             level: 'info',
-            filename: `${appRoot}/logs/app.log`,
+            timestamp: true,
+            filename: `${appRoot}/logs/${todays}/info.log`,
             handleExpections: true,
             json: true,
             maxsize: 5242880 //5MB   
         }),
-        new winston.transports.Console()
+        new winston.transports.File({
+            level: 'error',
+            timestamp: true,
+            filename: `${appRoot}/logs/${todays}/error.log`,
+            handleExpections: true,
+            json: true,
+            maxsize: 5242880 //5MB   
+        }),
+        new winston.transports.File({
+            level: 'warn',
+            timestamp: true,
+            filename: `${appRoot}/logs/${todays}/warn.log`,
+            handleExpections: true,
+            json: true,
+            maxsize: 5242880 //5MB   
+        }),
+        new winston.transports.Console({
+            timestamp: true
+        })
     ]
 })
 
