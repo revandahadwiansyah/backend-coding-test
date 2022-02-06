@@ -116,7 +116,7 @@ module.exports = (db, logger) => {
 
     app.get('/rides/:id', async (req, res) => {
         var pathFiles = '[API][rides][${req.params.id}]';
-        Logger.info(`${pathFiles}: GET`)
+        logger.info(`${pathFiles}: GET`)
         logger.info(`${pathFiles}[params]: ${JSON.stringify(req.params)}`)
 
         var response = await getRiderDetails(db, logger, req.params);
@@ -179,7 +179,8 @@ async function getRiderDetails(db, logger, params) {
     return new Promise((resolve,reject) => {
         try{
             db.all(
-            `SELECT * FROM Rides WHERE rideID='${req.params.id}'`,
+            'SELECT * FROM Rides WHERE rideID=?',
+            [req.params.id],
             function (err, rows) {
                 if (err) {
                     logger.error(`${pathFiles}: ${err}`)
