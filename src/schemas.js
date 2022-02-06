@@ -1,4 +1,5 @@
 module.exports = (db) => {
+    db.run(`DROP TABLE Rides`)
     const createRideTableSchema = `
         CREATE TABLE Rides
         (
