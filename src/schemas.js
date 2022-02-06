@@ -1,5 +1,3 @@
-'use strict';
-
 module.exports = (db) => {
     const createRideTableSchema = `
         CREATE TABLE Rides
@@ -14,9 +12,9 @@ module.exports = (db) => {
         driverVehicle TEXT NOT NULL,
         created DATETIME default CURRENT_TIMESTAMP
         )
-    `;
+    `
 
-    db.run(createRideTableSchema);
+    db.run(createRideTableSchema)
 
-    return db;
-};
+    return db
+}
